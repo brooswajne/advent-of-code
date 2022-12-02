@@ -1,32 +1,27 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Shape {
     Rock,
     Paper,
     Scissors,
 }
 
+impl TryFrom<char> for Shape {
+    type Error = ();
+
+    fn try_from(c: char) -> Result<Self, ()> {
+        match c {
+            'A' => Ok(Shape::Rock),
+            'B' => Ok(Shape::Paper),
+            'C' => Ok(Shape::Scissors),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Shape {
-    fn from_opponent_pick(pick: char) -> Option<Self> {
-        match pick {
-            'A' => Some(Shape::Rock),
-            'B' => Some(Shape::Paper),
-            'C' => Some(Shape::Scissors),
-            _ => None,
-        }
-    }
-
-    fn from_my_pick(pick: char) -> Option<Self> {
-        match pick {
-            'X' => Some(Shape::Rock),
-            'Y' => Some(Shape::Paper),
-            'Z' => Some(Shape::Scissors),
-            _ => None,
-        }
-    }
-
     fn fight_against(&self, other: &Shape) -> Outcome {
         match self {
             Shape::Rock => match other {
@@ -47,6 +42,22 @@ impl Shape {
         }
     }
 
+    fn response_for(&self, outcome: &Outcome) -> Shape {
+        match outcome {
+            Outcome::Win => match self {
+                Shape::Rock => Shape::Paper,
+                Shape::Paper => Shape::Scissors,
+                Shape::Scissors => Shape::Rock,
+            },
+            Outcome::Draw => self.clone(),
+            Outcome::Loss => match self {
+                Shape::Rock => Shape::Scissors,
+                Shape::Paper => Shape::Rock,
+                Shape::Scissors => Shape::Paper,
+            },
+        }
+    }
+
     fn score(&self) -> u32 {
         match self {
             Shape::Rock => 1,
@@ -61,6 +72,19 @@ enum Outcome {
     Win,
     Draw,
     Loss,
+}
+
+impl TryFrom<char> for Outcome {
+    type Error = ();
+
+    fn try_from(c: char) -> Result<Self, ()> {
+        match c {
+            'X' => Ok(Outcome::Loss),
+            'Y' => Ok(Outcome::Draw),
+            'Z' => Ok(Outcome::Win),
+            _ => Err(()),
+        }
+    }
 }
 
 impl Outcome {
@@ -87,15 +111,17 @@ fn main() {
     for line in lines {
         let line = line.expect("unable to read input line");
         let mut chars = line.chars();
-        let them = chars
+        let them: Shape = chars
             .next()
-            .and_then(Shape::from_opponent_pick)
+            .expect("no opponent pick")
+            .try_into()
             .expect("unable to parse opponent pick");
-        let me = chars
+        let outcome: Outcome = chars
             .nth(1)
-            .and_then(Shape::from_my_pick)
-            .expect("unable to parse my pick");
-        let outcome = me.fight_against(&them);
+            .expect("no desired outcome")
+            .try_into()
+            .expect("unable to parse desired outcome");
+        let me = them.response_for(&outcome);
         score += me.score() + outcome.score();
     }
 
