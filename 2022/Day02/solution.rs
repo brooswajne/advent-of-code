@@ -1,7 +1,8 @@
+use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
-#[derive(Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 enum Shape {
     Rock,
     Paper,
@@ -21,25 +22,36 @@ impl TryFrom<char> for Shape {
     }
 }
 
-impl Shape {
-    fn fight_against(&self, other: &Shape) -> Outcome {
+impl Ord for Shape {
+    fn cmp(&self, other: &Self) -> Ordering {
         match self {
             Shape::Rock => match other {
-                Shape::Rock => Outcome::Draw,
-                Shape::Paper => Outcome::Loss,
-                Shape::Scissors => Outcome::Win,
+                Shape::Rock => Ordering::Equal,
+                Shape::Paper => Ordering::Less,
+                Shape::Scissors => Ordering::Greater,
             },
             Shape::Paper => match other {
-                Shape::Rock => Outcome::Win,
-                Shape::Paper => Outcome::Draw,
-                Shape::Scissors => Outcome::Loss,
+                Shape::Rock => Ordering::Greater,
+                Shape::Paper => Ordering::Equal,
+                Shape::Scissors => Ordering::Less,
             },
             Shape::Scissors => match other {
-                Shape::Rock => Outcome::Loss,
-                Shape::Paper => Outcome::Win,
-                Shape::Scissors => Outcome::Draw,
+                Shape::Rock => Ordering::Less,
+                Shape::Paper => Ordering::Greater,
+                Shape::Scissors => Ordering::Equal,
             },
         }
+    }
+}
+impl PartialOrd for Shape {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Shape {
+    fn fight_against(&self, other: &Shape) -> Outcome {
+        self.cmp(other).into()
     }
 
     fn response_for(&self, outcome: &Outcome) -> Shape {
@@ -67,13 +79,22 @@ impl Shape {
     }
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 enum Outcome {
     Win,
     Draw,
     Loss,
 }
 
+impl From<Ordering> for Outcome {
+    fn from(ordering: Ordering) -> Self {
+        match ordering {
+            Ordering::Greater => Outcome::Win,
+            Ordering::Equal => Outcome::Draw,
+            Ordering::Less => Outcome::Loss,
+        }
+    }
+}
 impl TryFrom<char> for Outcome {
     type Error = ();
 
@@ -122,6 +143,7 @@ fn main() {
             .try_into()
             .expect("unable to parse desired outcome");
         let me = them.response_for(&outcome);
+        assert!(me.fight_against(&them) == outcome);
         score += me.score() + outcome.score();
     }
 
