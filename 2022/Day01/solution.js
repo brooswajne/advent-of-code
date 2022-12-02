@@ -5,12 +5,12 @@ const lines = (await fetch(input)).body
   .pipeThrough(new TextDecoderStream())
   .pipeThrough(new TextLineStream());
 
-let maxCalories = -Infinity;
+const caloriesPerElf = [];
 let currentCalories = 0;
 for await (const line of lines) {
   const isEmptyLine = line.trim() === "";
   if (isEmptyLine) {
-    maxCalories = Math.max(maxCalories, currentCalories);
+    caloriesPerElf.push(currentCalories);
     currentCalories = 0;
   } else {
     const calories = parseInt(line, 10);
@@ -19,4 +19,10 @@ for await (const line of lines) {
   }
 }
 
-console.log({ maxCalories });
+const fattestElves = caloriesPerElf
+  .sort((a, b) => b - a)
+  .slice(0, 3);
+console.log({ fattestElves });
+const total = fattestElves
+  .reduce((total, calories) => total + calories, 0);
+console.log({ total });
