@@ -30,29 +30,38 @@ mod tests_for_get_priority {
     }
 }
 
+struct RucksackContents {
+    contents: [bool; 52],
+}
+impl RucksackContents {
+    fn new() -> Self { RucksackContents { contents: [false; 52] } }
+    fn add(&mut self, priority: &Priority) { self.contents[(priority - 1) as usize] = true }
+    fn has(&mut self, priority: &Priority) -> bool { self.contents[(priority - 1) as usize] }
+    fn reset(&mut self) { self.contents = [false; 52] }
+}
+
 struct RucksackSearchingElf {
-    contents_of_current_rucksack: [bool; 52],
+    contents_of_current_rucksack: RucksackContents,
 }
 
 impl RucksackSearchingElf {
     fn new() -> Self {
-        RucksackSearchingElf { contents_of_current_rucksack: [false; 52] }
+        RucksackSearchingElf { contents_of_current_rucksack: RucksackContents::new() }
     }
 
     fn search_rucksack(&mut self, rucksack: &str) -> Option<Priority> {
         // Reset from any previous searches
-        self.contents_of_current_rucksack = [false; 52];
+        self.contents_of_current_rucksack.reset();
 
         let contents = rucksack.chars();
         let number_of_items = rucksack.len();
         for (index, item) in contents.enumerate() {
             let priority = get_priority(item).expect("invalid rucksack item!");
-            let priority_index = (priority - 1) as usize;
-            let is_in_first_half = index < number_of_items / 2; 
+            let is_in_first_half = index < number_of_items / 2;
             if is_in_first_half {
-                self.contents_of_current_rucksack[priority_index] = true;
+                self.contents_of_current_rucksack.add(&priority);
             } else {
-                let is_already_in_rucksack = self.contents_of_current_rucksack[priority_index];
+                let is_already_in_rucksack = self.contents_of_current_rucksack.has(&priority);
                 if is_already_in_rucksack { return Some(priority); }
             }
         }
@@ -84,6 +93,75 @@ mod tests_rucksack_searching_elf {
     }
 }
 
+struct AuthenticatorElf {
+    rucksack_one: RucksackContents,
+    rucksack_two: RucksackContents,
+}
+
+impl AuthenticatorElf {
+    fn new() -> Self {
+        AuthenticatorElf {
+            rucksack_one: RucksackContents::new(),
+            rucksack_two: RucksackContents::new(),
+        }
+    }
+
+    fn inspect_rucksack_one(&mut self, rucksack: &str) {
+        // Reset from any previous searches
+        self.rucksack_one.reset();
+        for item in rucksack.chars() {
+            let priority = get_priority(item).expect("invalid rucksack item!");
+            self.rucksack_one.add(&priority);
+        }
+    }
+    fn inspect_rucksack_two(&mut self, rucksack: &str) {
+        // Reset from any previous searches
+        self.rucksack_two.reset();
+        for item in rucksack.chars() {
+            let priority = get_priority(item).expect("invalid rucksack item!");
+            self.rucksack_two.add(&priority);
+        }
+    }
+    fn inspect_rucksack_three(&mut self, rucksack: &str) -> Option<Priority> {
+        rucksack.chars()
+            .map(|item| get_priority(item).expect("invalid rucksack item!"))
+            .filter(|priority| self.rucksack_one.has(priority))
+            .find(|priority| self.rucksack_two.has(priority))
+    }
+}
+
+#[cfg(test)]
+mod tests_authenticator_elf {
+    use super::get_priority;
+    use super::AuthenticatorElf;
+
+    macro_rules! should_authenticate {
+        ($elf: ident, $rucksack_one: literal, $rucksack_two: literal, $rucksack_three: literal, $item: literal) => {
+            let expected_priority = get_priority($item).unwrap();
+            $elf.inspect_rucksack_one($rucksack_one);
+            $elf.inspect_rucksack_two($rucksack_two);
+            assert_eq!($elf.inspect_rucksack_three($rucksack_three), Some(expected_priority), "authentication priority for {} / {} / {} should be {} (item {})", $rucksack_one, $rucksack_two, $rucksack_three, expected_priority, $item);
+        }
+    }
+
+    #[test]
+    fn it_does_the_examples() {
+        let mut elf = AuthenticatorElf::new();
+        should_authenticate!(elf,
+            "vJrwpWtwJgWrhcsFMMfFFhFp",
+            "jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL",
+            "PmmdzqPrVvPwwTWBwg",
+            'r'
+        );
+        should_authenticate!(elf,
+            "wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn",
+            "ttgJtRGJQctTZtZT",
+            "CrZsJsPPZsGzwwsLwLmpwMDw",
+            'Z'
+        );
+    }
+}
+
 fn main() {
     let input_path = std::env::args()
         .nth(1)
@@ -94,13 +172,27 @@ fn main() {
     let input = File::open(input_path).expect("unable to open input file");
     let lines = BufReader::new(input).lines();
 
-    let mut sum_of_priorities: u32 = 0;
-    let mut elf = RucksackSearchingElf::new();
-    for line in lines {
+    let mut sum_of_search_priorities: u32 = 0;
+    let mut sum_of_auth_priorities: u32 = 0;
+    let mut search_elf = RucksackSearchingElf::new();
+    let mut auther_elf = AuthenticatorElf::new();
+    for (index, line) in lines.enumerate() {
         let rucksack = line.expect("unable to read rucksack contents");
-        let priority = elf.search_rucksack(&rucksack)
+        let priority = search_elf.search_rucksack(&rucksack)
             .expect("all rucksacks should have a repeated item");
-        sum_of_priorities += priority as u32;
+        sum_of_search_priorities += priority as u32;
+
+        match index % 3 {
+            0 => auther_elf.inspect_rucksack_one(&rucksack),
+            1 => auther_elf.inspect_rucksack_two(&rucksack),
+            2 => {
+                let priority = auther_elf.inspect_rucksack_three(&rucksack)
+                    .expect("all groups should have a common authentication badge");
+                sum_of_auth_priorities += priority as u32;
+            }
+            _ => unreachable!("modulo arithmetic is broken"),
+        }
     }
-    dbg!(sum_of_priorities);
+    dbg!(sum_of_search_priorities);
+    dbg!(sum_of_auth_priorities);
 }
