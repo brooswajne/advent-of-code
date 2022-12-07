@@ -33,6 +33,12 @@ impl SectionAssignment {
         self.first_section <= other.first_section
             && other.final_section <= self.final_section
     }
+
+    fn overlaps_with(&self, other: &SectionAssignment) -> bool {
+        let begins_too_late = other.first_section > self.final_section;
+        let ends_too_early = other.final_section < self.first_section;
+        !begins_too_late && !ends_too_early
+    }
 }
 
 #[cfg(test)]
@@ -51,6 +57,22 @@ mod test {
         assert_containment!("2-8", "3-7");
         assert_containment!("4-6", "6-6");
     }
+
+    #[test]
+    fn test_overlap_examples() {
+        macro_rules! assert_overlap {
+            ($one: literal, $two: literal) => {
+                let one: SectionAssignment = $one.into();
+                let two: SectionAssignment = $two.into();
+                assert!(one.overlaps_with(&two), "{:?} should overlap with {:?}", one, two);
+                assert!(two.overlaps_with(&one), "{:?} should overlap with {:?}", two, one);
+            }
+        }
+        assert_overlap!("5-7", "7-9");
+        assert_overlap!("2-8", "3-7");
+        assert_overlap!("6-6", "4-6");
+        assert_overlap!("2-6", "4-8");
+    }
 }
 
 fn main() {
@@ -64,6 +86,7 @@ fn main() {
     let lines = BufReader::new(input).lines();
 
     let mut num_full_containments = 0;
+    let mut num_overlaps = 0;
     for line in lines {
         let line = line.expect("unable to read input line");
         let mut assignments = line.split(',');
@@ -81,6 +104,10 @@ fn main() {
         if assignment_one.fully_contains(&assignment_two) || assignment_two.fully_contains(&assignment_one) {
             num_full_containments += 1;
         }
+        if assignment_one.overlaps_with(&assignment_two) {
+            num_overlaps += 1;
+        }
     }
     dbg!(num_full_containments);
+    dbg!(num_overlaps);
 }
