@@ -30,11 +30,11 @@ with open(input_file_path, "r") as input_file:
         if not line.startswith("move"): continue
         _move, amount, _from, source, _to, target = line.split(" ")
         amount = int(amount)
-        source = int(source) - 1
-        target = int(target) - 1
-        for _ in range(0, amount):
-            crate = stacks[source].pop()
-            stacks[target].append(crate)
+        source = stacks[int(source) - 1]
+        target = stacks[int(target) - 1]
+        crates = source[-amount:]
+        del source[-amount:]
+        target.extend(crates)
     
     print("Done:")
     for stack in stacks: print(stack)
